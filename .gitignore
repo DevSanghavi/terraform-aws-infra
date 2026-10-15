@@ -4,3 +4,6 @@
 crash.log
 *.tfvars
 .env
+app/.venv/
+app/__pycache__/
+*.pyc
