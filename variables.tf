@@ -1,7 +1,7 @@
 variable "aws_profile" {
   description = "AWS CLI profile"
   type        = string
-  default     = "cloudmentor-admin"
+  default     = ""
 }
 
 variable "aws_region" {
