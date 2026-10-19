@@ -20,6 +20,14 @@ resource "aws_security_group" "ec2" {
   }
 
   ingress {
+    description = "HTTP Proxy on port 8080"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     description = "SSH from home IP only"
     from_port   = 22
     to_port     = 22
