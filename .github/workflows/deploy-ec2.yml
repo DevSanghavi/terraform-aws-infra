@@ -79,10 +79,10 @@ jobs:
               sudo apt-get install -y docker.io docker-compose-v2
               sudo usermod -aG docker ubuntu
             fi
-            echo \"$GHCR_TOKEN\" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker compose -f /home/ubuntu/compose.yml pull
-            docker compose -f /home/ubuntu/compose.yml up -d
-            docker compose -f /home/ubuntu/compose.yml ps
+            echo \"$GHCR_TOKEN\" | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            sudo docker compose -f /home/ubuntu/compose.yml pull
+            sudo docker compose -f /home/ubuntu/compose.yml up -d
+            sudo docker compose -f /home/ubuntu/compose.yml ps
           "
 
       - name: Verify deployment
