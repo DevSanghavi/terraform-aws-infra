@@ -29,6 +29,9 @@ jobs:
           aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
           aws configure set region "$AWS_REGION"
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
       - name: Get deployment values
         id: deploy
         run: |
@@ -50,7 +53,14 @@ jobs:
           ssh-keygen -t ed25519 -f ~/.ssh/deploy_key -N ""
 
       - name: Send SSH public key
-        run: aws ec2-instance-connect send-ssh-public-key --instance-id "${{ steps.deploy.outputs.instance_id }}" --instance-os-user ubuntu --ssh-public-key "file://$HOME/.ssh/deploy_key.pub" --availability-zone us-east-1a
+        run: |
+          AZ=$(aws ec2 describe-instances --instance-ids "${{ steps.deploy.outputs.instance_id }}" --query "Reservations[0].Instances[0].Placement.AvailabilityZone" --output text)
+          echo "Instance Availability Zone: $AZ"
+          aws ec2-instance-connect send-ssh-public-key \
+            --instance-id "${{ steps.deploy.outputs.instance_id }}" \
+            --instance-os-user ubuntu \
+            --ssh-public-key "file://$HOME/.ssh/deploy_key.pub" \
+            --availability-zone "$AZ"
 
       - name: Copy deployment files
         run: |
