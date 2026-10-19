@@ -64,12 +64,11 @@ jobs:
 
       - name: Copy deployment files
         run: |
-          # 1. Ensure the remote directories exist first
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ubuntu@${{ steps.deploy.outputs.public_ip }} "rm -rf /home/ubuntu/app/nginx/default.conf && mkdir -p /home/ubuntu/app/nginx"
-          
+          # Completely wipe out any old corrupted directories and recreate fresh folders
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ubuntu@${{ steps.deploy.outputs.public_ip }} "sudo rm -rf /home/ubuntu/app /home/ubuntu/compose.yml && mkdir -p /home/ubuntu/app/nginx"
+
           # 2. Now securely copy the compose file and the nginx config file
           scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key app/compose.yml ubuntu@${{ steps.deploy.outputs.public_ip }}:/home/ubuntu/compose.yml
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ubuntu@${{ steps.deploy.outputs.public_ip }} "mkdir -p /home/ubuntu/app/nginx"
           scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key app/nginx/default.conf ubuntu@${{ steps.deploy.outputs.public_ip }}:/home/ubuntu/app/nginx/default.conf
 
       - name: Deploy Docker Compose stack
