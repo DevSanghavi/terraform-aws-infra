@@ -1,6 +1,6 @@
 services:
   flask:
-    image: terraform-aws-infra-api:day121
+    image: ghcr.io/devsanghavi/terraform-aws-infra-api:latest
     container_name: terraform-aws-infra-flask
     restart: unless-stopped
     environment:

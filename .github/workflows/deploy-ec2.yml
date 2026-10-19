@@ -1,0 +1,90 @@
+name: Deploy to EC2
+
+on:
+  workflow_run:
+    workflows:
+      - "Docker CI"
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: us-east-1
+      TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        run: |
+          aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+          aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+          aws configure set region "$AWS_REGION"
+
+      - name: Get deployment values
+        id: deploy
+        run: |
+          terraform init -input=false
+          echo "instance_id=$(terraform output -raw ec2_instance_id)" >> "$GITHUB_OUTPUT"
+          echo "public_ip=$(terraform output -raw ec2_public_ip)" >> "$GITHUB_OUTPUT"
+          echo "security_group_id=$(terraform output -raw ec2_security_group_id)" >> "$GITHUB_OUTPUT"
+
+      - name: Get runner IP
+        id: ip
+        run: echo "runner_ip=$(curl -s https://api.ipify.org)" >> "$GITHUB_OUTPUT"
+
+      - name: Authorize temporary SSH access
+        run: aws ec2 authorize-security-group-ingress --group-id "${{ steps.deploy.outputs.security_group_id }}" --protocol tcp --port 22 --cidr "${{ steps.ip.outputs.runner_ip }}/32"
+
+      - name: Generate SSH key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keygen -t ed25519 -f ~/.ssh/deploy_key -N ""
+
+      - name: Send SSH public key
+        run: aws ec2-instance-connect send-ssh-public-key --instance-id "${{ steps.deploy.outputs.instance_id }}" --instance-os-user ubuntu --ssh-public-key "file://$HOME/.ssh/deploy_key.pub" --availability-zone us-east-1a
+
+      - name: Copy deployment files
+        run: |
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key app/compose.yml ubuntu@${{ steps.deploy.outputs.public_ip }}:/home/ubuntu/compose.yml
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ubuntu@${{ steps.deploy.outputs.public_ip }} "mkdir -p /home/ubuntu/app/nginx"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key app/nginx/default.conf ubuntu@${{ steps.deploy.outputs.public_ip }}:/home/ubuntu/app/nginx/default.conf
+
+      - name: Deploy Docker Compose stack
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ubuntu@${{ steps.deploy.outputs.public_ip }} "
+            set -e
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo apt-get update -y
+              sudo apt-get install -y docker.io docker-compose-v2
+              sudo usermod -aG docker ubuntu
+            fi
+            echo \"$GHCR_TOKEN\" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f /home/ubuntu/compose.yml pull
+            docker compose -f /home/ubuntu/compose.yml up -d
+            docker compose -f /home/ubuntu/compose.yml ps
+          "
+
+      - name: Verify deployment
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -fsS "http://${{ steps.deploy.outputs.public_ip }}:8080/health"; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
+      - name: Revoke temporary SSH access
+        if: always()
+        run: aws ec2 revoke-security-group-ingress --group-id "${{ steps.deploy.outputs.security_group_id }}" --protocol tcp --port 22 --cidr "${{ steps.ip.outputs.runner_ip }}/32"

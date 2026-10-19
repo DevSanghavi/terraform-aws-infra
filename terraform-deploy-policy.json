@@ -19,6 +19,7 @@
       "Action": [
         "ec2:*",
         "rds:*",
+        "ec2-instance-connect:SendSSHPublicKey",
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
