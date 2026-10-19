@@ -79,6 +79,10 @@ jobs:
               sudo apt-get install -y docker.io docker-compose-v2
               sudo usermod -aG docker ubuntu
             fi
+            # Remove any accidental directories created by bad docker mounts
+            sudo rm -rf /home/ubuntu/nginx /home/ubuntu/app/nginx/default.conf
+            mkdir -p /home/ubuntu/app/nginx
+
             echo \"$GHCR_TOKEN\" | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
             sudo docker compose -f /home/ubuntu/compose.yml pull
             sudo docker compose -f /home/ubuntu/compose.yml up -d
