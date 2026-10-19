@@ -64,12 +64,14 @@ jobs:
 
       - name: Copy deployment files
         run: |
-          # Completely wipe out any old corrupted directories and recreate fresh folders
+          # 1. Force delete the entire app folder to wipe out any ghost directories
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ubuntu@${{ steps.deploy.outputs.public_ip }} "sudo rm -rf /home/ubuntu/app /home/ubuntu/compose.yml && mkdir -p /home/ubuntu/app/nginx"
 
-          # 2. Now securely copy the compose file and the nginx config file
+          # 2. Copy compose.yml to the home directory
           scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key app/compose.yml ubuntu@${{ steps.deploy.outputs.public_ip }}:/home/ubuntu/compose.yml
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key app/nginx/default.conf ubuntu@${{ steps.deploy.outputs.public_ip }}:/home/ubuntu/app/nginx/default.conf
+
+          # 3. Copy default.conf into the nginx folder as a proper file (note the trailing slash /)
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key app/nginx/default.conf ubuntu@${{ steps.deploy.outputs.public_ip }}:/home/ubuntu/app/nginx/
 
       - name: Deploy Docker Compose stack
         env:
@@ -82,9 +84,6 @@ jobs:
               sudo apt-get install -y docker.io docker-compose-v2
               sudo usermod -aG docker ubuntu
             fi
-            # Remove any accidental directories created by bad docker mounts
-            sudo rm -rf /home/ubuntu/nginx /home/ubuntu/app/nginx/default.conf
-            mkdir -p /home/ubuntu/app/nginx
 
             echo \"$GHCR_TOKEN\" | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
             sudo docker compose -f /home/ubuntu/compose.yml pull
