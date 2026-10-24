@@ -94,7 +94,7 @@ jobs:
       - name: Verify deployment
         run: |
           for i in 1 2 3 4 5; do
-            if curl -fsS "http://${{ steps.deploy.outputs.public_ip }}:8080/health"; then
+            if curl -fsS "http://${{ steps.deploy.outputs.public_ip }}/health"; then
               exit 0
             fi
             sleep 10
